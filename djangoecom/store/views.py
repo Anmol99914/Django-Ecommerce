@@ -1,11 +1,11 @@
 from django.shortcuts import render,redirect
-from .models import Product,Category
+from .models import Product,Category,Profile
 from django.contrib.auth import authenticate,login,logout
 from django.contrib import messages
 from django.contrib.auth.models import User
-from .forms import SignUpForm,UpdateUserForm
+from .forms import SignUpForm,UpdateUserForm,UserInfoForm
 from django import forms
-
+from django.db.models import Q
 
 
 # Create your views here.
@@ -48,8 +48,8 @@ def register_user(request):
             # login user
             user = authenticate(username = username, password = password)
             login(request, user)
-            messages.success(request,("You have registered successfully!"))
-            return redirect('home')
+            messages.success(request,("Username created! Fill the form to provide additional info.."))
+            return redirect('update_info')
         else:
             messages.error(request, "Please correct the errors in the form.")
             # messages.success(request,("OOPs! Some error occurred. Please try again!"))
@@ -92,3 +92,37 @@ def update_user(request):
         messages.success(request,"You must be logged in to access that page!!!!")
         return redirect('home')
 
+def update_info(request):
+	if request.user.is_authenticated:
+		# Get Current User
+		current_user = Profile.objects.get(user__id=request.user.id)
+		
+		# Get original User Form
+		form = UserInfoForm(request.POST or None, instance=current_user)
+		if form.is_valid():
+			# Save original form
+			form.save()
+
+			messages.success(request, "Your Info Has Been Updated!!")
+			return redirect('home')
+		return render(request, "update_info.html", {'form':form})
+	else:
+		messages.success(request, "You Must Be Logged In To Access That Page!!")
+		return redirect('home')
+
+def search(request):
+    # determine if they filled out the form
+    if request.method == "POST":
+        searched = request.POST['searched'] # name from the form
+
+        # query the products db model
+        searched = Product.objects.filter(Q(name__icontains = searched) | Q(description__icontains = searched)) # i means insensitive so Python and python is same
+
+        # test for  null
+        if not searched:
+            messages.error(request, "That product doesnot exist!!")
+            return render(request,'search.html',{})
+        else:
+            return render(request, "search.html", {'searched':searched})
+
+    return render(request, "search.html", {})
